@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English Challenge!</title>
+    <!-- Confetti Library for satisfying effects -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --primary: #4361ee;
+            --success: #2ec4b6;
+            --danger: #e71d36;
+            --warning: #ff9f1c;
+            --bg: #f8f9fa;
+            --text: #2b2d42;
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            user-select: none;
+        }
+
+        .page-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .main-wrapper {
+            display: flex;
+            align-items: stretch; /* Make children stretch to same height */
+            gap: 10px;
+            width: 90vw;
+            max-width: 1200px;
+            height: 500px; /* Fixed height for the main wrapper */
+        }
+
+        .container {
+            flex: 3;
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            position: relative;
+        }
+
+        .log-wrapper {
+            flex: 1;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 1rem;
+            display: none; /* Hidden by default */
+            flex-direction: column;
+        }
+        
+        .log-wrapper.visible {
+            display: flex;
+        }
+
+        #log-container {
+            overflow-y: auto;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column-reverse;
+            padding-right: 5px;
+        }
+        
+        .log-entry {
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 5px;
+            font-size: 1rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-shrink: 0; /* Prevent log entries from shrinking */
+        }
+        
+        .log-emoji {
+            margin-right: 0.5em;
+        }
+
+        .log-entry.correct {
+            background-color: #e8f9f7;
+        }
+        
+        .log-entry.wrong {
+            background-color: #fde8e8;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .score { color: var(--primary); }
+        .streak { color: var(--warning); }
+
+        #log-toggle {
+            cursor: pointer;
+            font-size: 1rem;
+            color: var(--primary);
+            vertical-align: middle;
+        }
+
+        .question {
+            font-size: 2.5rem; /* Adjusted for longer text */
+            font-weight: bold;
+            margin-bottom: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            min-height: 80px; /* Ensure space for question */
+        }
+
+        .options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .option {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 1rem; /* Adjusted for potentially longer answers */
+            font-size: 1.5rem; /* Adjusted for potentially longer answers */
+            font-family: inherit;
+            cursor: pointer;
+            transition: transform 0.1s, background-color 0.2s, box-shadow 0.2s;
+            box-shadow: 0 5px 0 #2a3d99;
+            position: relative;
+        }
+
+        .option:active {
+            transform: translateY(5px);
+            box-shadow: 0 0 0 #2a3d99;
+        }
+
+        .option.focused {
+            outline: 5px solid var(--warning);
+            outline-offset: 3px;
+            transform: scale(1.05);
+        }
+
+        .option.correct {
+            background-color: var(--success);
+            box-shadow: 0 5px 0 #1b8a7f;
+        }
+
+        .option.wrong {
+            background-color: var(--danger);
+            box-shadow: 0 5px 0 #a31124;
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        .option.wrong-permanent {
+            background-color: #ff4d6d;
+            box-shadow: 0 5px 0 #c91838;
+            opacity: 0.8;
+            cursor: not-allowed;
+            transform: translateY(5px);
+            pointer-events: none;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        .feedback {
+            height: 2rem;
+            margin-top: 1.5rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .feedback.show {
+            opacity: 1;
+        }
+
+        .feedback.success { color: var(--success); }
+        .feedback.error { color: var(--danger); }
+
+        .controls-hint {
+            margin-top: 2rem;
+            color: #6c757d;
+            font-size: 0.9rem;
+            font-family: sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .level-up {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 4rem;
+            color: var(--warning);
+            text-shadow: 0 0 10px white, 0 0 20px white;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 10;
+            white-space: nowrap;
+        }
+
+        @keyframes popOut {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+        }
+
+        @media (max-width: 768px) {
+            .main-wrapper {
+                flex-direction: column;
+                height: auto;
+            }
+            .log-wrapper {
+                margin-top: 10px;
+                height: 200px; /* Fixed height for log on mobile */
+            }
+        }
+
+        @media (max-width: 480px) {
+            .question { font-size: 2rem; }
+            .option { font-size: 1.2rem; padding: 0.8rem; }
+            .header { font-size: 1.2rem; }
+            .level-up { font-size: 2.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <div class="main-wrapper">
+            <div class="container">
+                <div class="header">
+                    <div class="score">Score: <span id="score-val">0</span></div>
+                    <div class="streak">🔥 Streak: <span id="streak-val">0</span></div>
+                </div>
+                <div class="question" id="question">Loading...</div>
+                <div class="options" id="options">
+                    <button class="option" id="opt-0">A</button>
+                    <button class="option" id="opt-1">B</button>
+                    <button class="option" id="opt-2">C</button>
+                    <button class="option" id="opt-3">D</button>
+                </div>
+                <div class="feedback" id="feedback">Feedback</div>
+                <div class="level-up" id="level-up">Level Up! 🌟</div>
+            </div>
+            <div id="log-wrapper" class="log-wrapper">
+                <h2>Answered Questions</h2>
+                <div id="log-container"></div>
+            </div>
+        </div>
+        <div class="controls-hint">
+            Use 🖱️ Click or ⌨️ Arrow Keys + Enter &nbsp;<span id="log-toggle">👁️</span>
+        </div>
+    </div>
+
+    <script>
+        // 100 English Questions for Standard 4
+        const questions = [
+            { q: "Which word is a noun?", o: ["run", "happy", "book", "quickly"], a: "book" },
+            { q: "I have ___ apple.", o: ["a", "an", "the", "any"], a: "an" },
+            { q: "The cat is sleeping ___ the mat.", o: ["in", "on", "at", "with"], a: "on" },
+            { q: "What is the past tense of 'go'?", o: ["goed", "gone", "went", "goes"], a: "went" },
+            { q: "A person who flies a plane is a ___.", o: ["doctor", "pilot", "teacher", "farmer"], a: "pilot" },
+            { q: "Which is the opposite of 'hot'?", o: ["warm", "cold", "fire", "sun"], a: "cold" },
+            { q: "The plural of 'mouse' is ___.", o: ["mouses", "mice", "mouse", "meese"], a: "mice" },
+            { q: "She ___ to school every day.", o: ["go", "goes", "is going", "went"], a: "goes" },
+            { q: "A place where you borrow books.", o: ["shop", "park", "library", "canteen"], a: "library" },
+            { q: "Which word means 'very big'?", o: ["tiny", "small", "huge", "little"], a: "huge" },
+            { q: "The sun ___ in the east.", o: ["rise", "rises", "rose", "risen"], a: "rises" },
+            { q: "We use our ___ to see.", o: ["ears", "nose", "eyes", "hands"], a: "eyes" },
+            { q: "A cow says '___'.", o: ["oink", "meow", "moo", "baa"], a: "moo" },
+            { q: "Which is NOT a fruit?", o: ["apple", "banana", "carrot", "orange"], a: "carrot" },
+            { q: "I write with a ___.", o: ["chair", "pen", "spoon", "bed"], a: "pen" },
+            { q: "He is ___ an ice cream.", o: ["eat", "eats", "eating", "ate"], a: "eating" },
+            { q: "The opposite of 'fast' is ___.", o: ["quick", "run", "slow", "stop"], a: "slow" },
+            { q: "A ___ has eight legs.", o: ["bee", "ant", "spider", "fly"], a: "spider" },
+            { q: "We sleep in the ___.", o: ["kitchen", "bathroom", "bedroom", "living room"], a: "bedroom" },
+            { q: "The sky is ___.", o: ["green", "blue", "red", "yellow"], a: "blue" },
+            { q: "Which month has 28 or 29 days?", o: ["January", "February", "March", "April"], a: "February" },
+            { q: "A baby dog is a ___.", o: ["kitten", "puppy", "cub", "chick"], a: "puppy" },
+            { q: "They ___ playing football now.", o: ["is", "am", "are", "was"], a: "are" },
+            { q: "The synonym of 'happy' is ___.", o: ["sad", "angry", "joyful", "tired"], a: "joyful" },
+            { q: "What do you do with a book?", o: ["eat", "drink", "read", "play"], a: "read" },
+            { q: "A lion is a ___ animal.", o: ["tame", "pet", "wild", "farm"], a: "wild" },
+            { q: "The plural of 'leaf' is ___.", o: ["leafs", "leaves", "leafe", "leafes"], a: "leaves" },
+            { q: "I ___ a student.", o: ["is", "am", "are", "be"], a: "am" },
+            { q: "Which word is a verb?", o: ["car", "jump", "red", "slowly"], a: "jump" },
+            { q: "The opposite of 'day' is ___.", o: ["morning", "sun", "night", "evening"], a: "night" },
+            { q: "A baker bakes ___.", o: ["clothes", "bread", "shoes", "furniture"], a: "bread" },
+            { q: "We smell with our ___.", o: ["eyes", "ears", "mouth", "nose"], a: "nose" },
+            { q: "Yesterday, I ___ to the park.", o: ["go", "goes", "went", "gone"], a: "went" },
+            { q: "Which of these is a vegetable?", o: ["mango", "potato", "grape", "pear"], a: "potato" },
+            { q: "A hospital is a place for ___ people.", o: ["hungry", "sick", "happy", "rich"], a: "sick" },
+            { q: "The antonym of 'beautiful' is ___.", o: ["pretty", "lovely", "ugly", "nice"], a: "ugly" },
+            { q: "The cat chased the ___.", o: ["mouse", "house", "cloud", "flower"], a: "mouse" },
+            { q: "I will ___ my homework tomorrow.", o: ["do", "did", "done", "does"], a: "do" },
+            { q: "A car has four ___.", o: ["wings", "wheels", "doors", "windows"], a: "wheels" },
+            { q: "What is the sound a duck makes?", o: ["oink", "quack", "chirp", "bark"], a: "quack" },
+            { q: "Choose the correct spelling.", o: ["elefant", "elephant", "elephent", "elyphant"], a: "elephant" },
+            { q: "The children ___ in the field.", o: ["plays", "play", "is playing", "am playing"], a: "play" },
+            { q: "Water is for ___.", o: ["eating", "drinking", "sleeping", "running"], a: "drinking" },
+            { q: "The opposite of 'full' is ___.", o: ["heavy", "empty", "many", "complete"], a: "empty" },
+            { q: "A fish swims in the ___.", o: ["sky", "forest", "water", "desert"], a: "water" },
+            { q: "Which is a piece of furniture?", o: ["plate", "comb", "table", "shirt"], a: "table" },
+            { q: "She ___ a beautiful song yesterday.", o: ["sing", "sings", "sang", "sung"], a: "sang" },
+            { q: "The capital of Malaysia is ___.", o: ["Penang", "Johor Bahru", "Kuala Lumpur", "Kuching"], a: "Kuala Lumpur" },
+            { q: "A week has ___ days.", o: ["five", "six", "seven", "eight"], a: "seven" },
+            { q: "The plural of 'child' is ___.", o: ["childs", "childrens", "children", "childes"], a: "children" },
+            { q: "Look at ___ beautiful rainbow!", o: ["a", "an", "that", "those"], a: "that" },
+            { q: "Which is a synonym for 'small'?", o: ["big", "large", "little", "wide"], a: "little" },
+            { q: "A pilot flies an ___.", o: ["aeroplane", "autocar", "aquarium", "artship"], a: "aeroplane" },
+            { q: "The moon shines at ___.", o: ["day", "noon", "night", "morning"], a: "night" },
+            { q: "I am thirsty. I need some ___.", o: ["food", "water", "sleep", "air"], a: "water" },
+            { q: "He kicked the ball ___ his foot.", o: ["with", "by", "for", "from"], a: "with" },
+            { q: "Past tense of 'eat' is ___.", o: ["eated", "eaten", "ate", "eat"], a: "ate" },
+            { q: "An apple a day keeps the ___ away.", o: ["teacher", "friend", "doctor", "postman"], a: "doctor" },
+            { q: "The opposite of 'strong' is ___.", o: ["brave", "weak", "big", "heavy"], a: "weak" },
+            { q: "A ___ gives us wool.", o: ["cow", "goat", "sheep", "hen"], a: "sheep" },
+            { q: "Which is the correct sentence?", o: ["She is a girl beautiful.", "She a girl is beautiful.", "She is a beautiful girl.", "A beautiful girl she is."], a: "She is a beautiful girl." },
+            { q: "I bought ___ new shoes.", o: ["a", "some", "any", "one"], a: "some" },
+            { q: "A dolphin is a type of ___.", o: ["bird", "insect", "mammal", "reptile"], a: "mammal" },
+            { q: "The book is ___ the table.", o: ["in", "on", "under", "over"], a: "on" },
+            { q: "I can ___ very fast.", o: ["ran", "run", "runs", "running"], a: "run" },
+            { q: "Choose the silent letter in 'knife'.", o: ["k", "n", "i", "f"], a: "k" },
+            { q: "Which is an adjective?", o: ["school", "happily", "beautiful", "play"], a: "beautiful" },
+            { q: "We celebrate Hari Raya ___ Syawal.", o: ["in", "on", "at", "during"], a: "in" },
+            { q: "The ___ is the king of the jungle.", o: ["tiger", "lion", "elephant", "monkey"], a: "lion" },
+            { q: "What is the opposite of 'start'?", o: ["begin", "go", "finish", "open"], a: "finish" },
+            { q: "The past tense of 'see' is ___.", o: ["seed", "saw", "seen", "seeing"], a: "saw" },
+            { q: "A person who teaches is a ___.", o: ["teacher", "student", "player", "dancer"], a: "teacher" },
+            { q: "There are twelve ___ in a year.", o: ["days", "weeks", "months", "hours"], a: "months" },
+            { q: "A baby cat is called a ___.", o: ["puppy", "chick", "kitten", "cub"], a: "kitten" },
+            { q: "Which word rhymes with 'cat'?", o: ["hat", "cot", "cut", "car"], a: "hat" },
+            { q: "He ___ television every evening.", o: ["watch", "watches", "watching", "watched"], a: "watches" },
+            { q: "The plural of 'woman' is ___.", o: ["womans", "women", "womens", "womanes"], a: "women" },
+            { q: "My father is a doctor. ___ works in a hospital.", o: ["She", "He", "It", "They"], a: "He" },
+            { q: "The sun is very ___ today.", o: ["hot", "cold", "wet", "dark"], a: "hot" },
+            { q: "Which of these is a liquid?", o: ["rock", "milk", "bread", "ice"], a: "milk" },
+            { q: "I use a ___ to call my friend.", o: ["book", "television", "phone", "radio"], a: "phone" },
+            { q: "The opposite of 'rich' is ___.", o: ["wealthy", "poor", "happy", "sad"], a: "poor" },
+            { q: "A bicycle has ___ wheels.", o: ["one", "two", "three", "four"], a: "two" },
+            { q: "The bird is flying ___ the sky.", o: ["on", "at", "in", "under"], a: "in" },
+            { q: "Can you help ___?", o: ["I", "my", "me", "mine"], a: "me" },
+            { q: "She ___ her teeth every morning.", o: ["brush", "brushes", "brushed", "brushing"], a: "brushes" },
+            { q: "A firefighter puts out ___.", o: ["water", "fire", "wind", "sand"], a: "fire" },
+            { q: "The synonym of 'look' is ___.", o: ["see", "hear", "smell", "taste"], a: "see" },
+            { q: "We live on Planet ___.", o: ["Mars", "Venus", "Earth", "Jupiter"], a: "Earth" },
+            { q: "The national flower of Malaysia is the ___.", o: ["rose", "orchid", "hibiscus", "sunflower"], a: "hibiscus" },
+            { q: "Which of these can fly?", o: ["cat", "dog", "bird", "fish"], a: "bird" },
+            { q: "The opposite of 'short' is ___.", o: ["small", "long", "thin", "narrow"], a: "long" },
+            { q: "I am going ___ the market.", o: ["to", "at", "in", "for"], a: "to" },
+            { q: "The plural of 'man' is ___.", o: ["mans", "menes", "men", "mens"], a: "men" },
+            { q: "The turtle walks very ___.", o: ["fast", "quickly", "slowly", "rapidly"], a: "slowly" },
+            { q: "Which animal lives in the sea?", o: ["monkey", "whale", "lion", "zebra"], a: "whale" },
+        ];
+        
+        // Game State
+        let currentAnswer = '';
+        let currentQuestionText = '';
+        let score = 0;
+        let streak = 0;
+        let level = 1;
+        let isWaitingForNext = false;
+        let focusedOptionIndex = -1;
+        let askedQuestions = [];
+
+        // DOM Elements
+        const questionEl = document.getElementById('question');
+        const optionsContainer = document.getElementById('options');
+        const optionEls = [
+            document.getElementById('opt-0'),
+            document.getElementById('opt-1'),
+            document.getElementById('opt-2'),
+            document.getElementById('opt-3')
+        ];
+        const scoreEl = document.getElementById('score-val');
+        const streakEl = document.getElementById('streak-val');
+        const feedbackEl = document.getElementById('feedback');
+        const levelUpEl = document.getElementById('level-up');
+        const logWrapper = document.getElementById('log-wrapper');
+        const logToggle = document.getElementById('log-toggle');
+        const logContainer = document.getElementById('log-container');
+
+        // Audio Context for simple sounds
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function playSound(type) {
+            if (!audioCtx) audioCtx = new AudioContext();
+
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'correct') {
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+                oscillator.frequency.exponentialRampToValueAtTime(1046.50, audioCtx.currentTime + 0.1); // C6
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'wrong') {
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.2);
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.2);
+            } else if (type === 'levelup') {
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+                oscillator.frequency.setValueAtTime(554.37, audioCtx.currentTime + 0.1);
+                oscillator.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.2);
+                oscillator.frequency.setValueAtTime(880, audioCtx.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.6);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.6);
+            }
+        }
+        
+        // Add to Log
+        function addLogEntry(question, selectedAnswer, isCorrect) {
+            const logEntry = document.createElement('div');
+            logEntry.classList.add('log-entry');
+            logEntry.classList.add(isCorrect ? 'correct' : 'wrong');
+            const emoji = isCorrect ? '✅' : '❌';
+            const fullQuestionText = `${question.q} -> ${isCorrect ? selectedAnswer : `<s>${selectedAnswer}</s> (${currentAnswer})`}`;
+            logEntry.innerHTML = `<span class="log-emoji">${emoji}</span> ${fullQuestionText}`;
+            logContainer.prepend(logEntry);
+        }
+        
+        // Generate Question
+        function generateQuestion() {
+            isWaitingForNext = false;
+            focusedOptionIndex = -1;
+            updateFocus();
+
+            // Reset styles
+            optionEls.forEach(el => {
+                el.className = 'option';
+                el.disabled = false;
+            });
+            feedbackEl.className = 'feedback';
+
+            // Pick a question that hasn't been asked
+            if (askedQuestions.length === questions.length) {
+                // All questions asked, reset for replayability
+                askedQuestions = [];
+            }
+
+            let questionIndex;
+            do {
+                questionIndex = Math.floor(Math.random() * questions.length);
+            } while (askedQuestions.includes(questionIndex));
+            
+            askedQuestions.push(questionIndex);
+
+            const question = questions[questionIndex];
+            currentAnswer = question.a;
+            currentQuestionText = question;
+            questionEl.textContent = question.q;
+
+            // Shuffle and assign options
+            let answers = [...question.o];
+            answers.sort(() => Math.random() - 0.5);
+
+            optionEls.forEach((el, index) => {
+                el.textContent = answers[index];
+                el.dataset.value = answers[index];
+                el.onclick = () => handleAnswer(el, answers[index]);
+            });
+        }
+
+        // Handle Answer
+        function handleAnswer(element, selectedAnswer) {
+            if (isWaitingForNext || element.classList.contains('wrong') || element.classList.contains('wrong-permanent')) return;
+
+            // Initialize audio on first user interaction if needed
+            if (!audioCtx) audioCtx = new AudioContext();
+
+            const isCorrect = selectedAnswer === currentAnswer;
+            addLogEntry(currentQuestionText, selectedAnswer, isCorrect);
+
+            if (isCorrect) {
+                // Correct Answer
+                isWaitingForNext = true;
+                element.classList.add('correct');
+                playSound('correct');
+
+                score += 10 + streak;
+                streak++;
+
+                scoreEl.textContent = score;
+                streakEl.textContent = streak;
+
+                feedbackEl.textContent = "Awesome! 🎉";
+                feedbackEl.className = 'feedback show success';
+
+                // Check for level up every 5 streaks
+                if (streak > 0 && streak % 5 === 0) {
+                    playSound('levelup');
+                    levelUpEl.style.animation = 'popOut 2s ease-out forwards';
+                    setTimeout(() => { levelUpEl.style.animation = ''; }, 2000);
+                }
+                
+                // Confetti for correct answer
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+
+                // Next question after a short delay
+                setTimeout(generateQuestion, 1000);
+
+            } else {
+                // Wrong Answer
+                element.classList.add('wrong');
+                playSound('wrong');
+
+                streak = 0;
+                streakEl.textContent = streak;
+
+                feedbackEl.textContent = "Oops! Try again. ❌";
+                feedbackEl.className = 'feedback show error';
+
+                // Mark the correct answer for the user to see
+                optionEls.forEach(el => {
+                    if (el.dataset.value === currentAnswer) {
+                        el.classList.add('correct');
+                    }
+                });
+
+                // Move to next question after a longer delay
+                isWaitingForNext = true;
+                setTimeout(generateQuestion, 2000);
+            }
+        }
+
+        // Keyboard Navigation
+        function updateFocus() {
+            optionEls.forEach((el, index) => {
+                if (index === focusedOptionIndex) {
+                    el.classList.add('focused');
+                } else {
+                    el.classList.remove('focused');
+                }
+            });
+        }
+        
+        // Log Toggle
+        logToggle.addEventListener('click', () => {
+            logWrapper.classList.toggle('visible');
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (isWaitingForNext) return;
+
+            switch(e.key) {
+                case 'ArrowRight':
+                    e.preventDefault();
+                    if (focusedOptionIndex === -1) focusedOptionIndex = 0;
+                    else if (focusedOptionIndex === 0) focusedOptionIndex = 1;
+                    else if (focusedOptionIndex === 2) focusedOptionIndex = 3;
+                    updateFocus();
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    if (focusedOptionIndex === -1) focusedOptionIndex = 0;
+                    else if (focusedOptionIndex === 1) focusedOptionIndex = 0;
+                    else if (focusedOptionIndex === 3) focusedOptionIndex = 2;
+                    updateFocus();
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    if (focusedOptionIndex === -1) focusedOptionIndex = 0;
+                    else if (focusedOptionIndex === 0) focusedOptionIndex = 2;
+                    else if (focusedOptionIndex === 1) focusedOptionIndex = 3;
+                    updateFocus();
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    if (focusedOptionIndex === -1) focusedOptionIndex = 0;
+                    else if (focusedOptionIndex === 2) focusedOptionIndex = 0;
+                    else if (focusedOptionIndex === 3) focusedOptionIndex = 1;
+                    updateFocus();
+                    break;
+                case 'Enter':
+                case ' ':
+                    e.preventDefault();
+                    if (focusedOptionIndex !== -1) {
+                        const el = optionEls[focusedOptionIndex];
+                        handleAnswer(el, el.dataset.value);
+                    }
+                    break;
+            }
+        });
+
+        // Initialize game
+        generateQuestion();
+    </script>
+</body>
+</html>
